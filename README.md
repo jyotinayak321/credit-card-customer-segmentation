@@ -20,7 +20,7 @@ An end-to-end machine learning pipeline that discovers natural behavioural segme
 - [Evaluation](#evaluation)
 - [Limitations](#limitations)
 - [Tech Stack](#tech-stack)
-- [License](#license)
+
 
 ---
 
