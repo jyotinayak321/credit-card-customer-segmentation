@@ -242,8 +242,3 @@ Since clustering has no ground-truth labels, evaluation relies on:
 - **Matplotlib**, **Seaborn** — visualization
 - **Jupyter** — exploratory analysis
 
----
-
-## License
-
-This project is intended for educational purposes. The dataset is sourced from Kaggle and subject to its original license terms.
