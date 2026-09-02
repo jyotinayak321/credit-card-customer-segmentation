@@ -2,23 +2,24 @@
 data_loader.py
 ---------------
 Responsible ONLY for loading the CSV and doing a first inspection.
-Keeping this separate from preprocessing/clustering follows the
-"single responsibility" principle - each file does ONE job.
 """
 
 import pandas as pd
 
+try:
+    from .config import DEFAULT_DATA_PATH
+except ImportError:
+    from config import DEFAULT_DATA_PATH
 
-def load_data(path: str) -> pd.DataFrame:
+
+def load_data(path: str = None) -> pd.DataFrame:
     """Load the credit card dataset from a CSV file."""
+    path = path or DEFAULT_DATA_PATH
     df = pd.read_csv(path)
     return df
 
 
 def inspect_data(df: pd.DataFrame) -> None:
-    """Print a quick summary: shape, dtypes, missing values, duplicates.
-    Always run this BEFORE touching the data - you must understand
-    what you have before you clean or model it."""
     print("=" * 60)
     print("SHAPE:", df.shape)
     print("=" * 60)
@@ -32,5 +33,5 @@ def inspect_data(df: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    df = load_data("../data/credit_card_customers.csv")
+    df = load_data()
     inspect_data(df)
