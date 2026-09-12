@@ -47,3 +47,69 @@ def plot_pca_clusters(X_scaled, labels, save_path=None):
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+    
+
+def plot_outlier_boxplots(df, features=None, save_path=None):
+    """Visual representation of outliers using boxplots - complements
+    the numeric IQR report in preprocessing.detect_outliers().
+
+    Each box shows: Q1-Q3 range (the box), whiskers (1.5x IQR), and
+    individual dots beyond the whiskers = the same outliers that
+    detect_outliers() counts numerically.
+    """
+    try:
+        from .config import OUTPUT_DIR, DEFAULT_FEATURES
+    except ImportError:
+        from config import OUTPUT_DIR, DEFAULT_FEATURES
+
+    features = features or DEFAULT_FEATURES
+    save_path = save_path or (OUTPUT_DIR / "outlier_boxplots.png")
+
+    n_cols = 3
+    n_rows = -(-len(features) // n_cols)  # ceiling division
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
+    axes = axes.flatten()
+
+    for i, col in enumerate(features):
+        sns.boxplot(y=df[col], ax=axes[i], color="skyblue")
+        axes[i].set_title(col, fontsize=10)
+
+    # Hide any unused subplot slots
+    for j in range(len(features), len(axes)):
+        axes[j].axis("off")
+
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    
+def plot_dbscan_pca(X_scaled, dbscan_labels, save_path=None):
+    """PCA scatter plot for DBSCAN results - noise points (-1) are
+    shown as gray X markers, distinct from real clusters."""
+    try:
+        from .config import OUTPUT_DIR
+    except ImportError:
+        from config import OUTPUT_DIR
+
+    save_path = save_path or (OUTPUT_DIR / "dbscan_pca.png")
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+
+    plt.figure(figsize=(8, 6))
+    noise_mask = dbscan_labels == -1
+    cluster_mask = ~noise_mask
+
+    if cluster_mask.any():
+        scatter = plt.scatter(X_pca[cluster_mask, 0], X_pca[cluster_mask, 1],
+                            c=dbscan_labels[cluster_mask], cmap="tab10", s=20, label="Clusters")
+        plt.colorbar(scatter, label="DBSCAN cluster")
+    if noise_mask.any():
+        plt.scatter(X_pca[noise_mask, 0], X_pca[noise_mask, 1],
+                    c="gray", marker="x", s=30, label="Noise (-1)")
+
+    plt.xlabel("Principal Component 1")
+    plt.ylabel("Principal Component 2")
+    plt.title("DBSCAN Clusters in PCA Space (noise marked as x)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()

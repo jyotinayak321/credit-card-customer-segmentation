@@ -71,3 +71,12 @@ def evaluate_cluster_health(df, cluster_col: str = "Cluster") -> None:
         elif pct < 0.02:
             flag = "  ⚠️  WARNING: very small cluster (<2%) - may be noise/outliers"
         print(f"  Cluster {cluster_id}: {pct:.1%}{flag}")
+        
+def profile_dbscan_clusters(df, dbscan_labels, features):
+    """Same idea as profile_clusters() but for DBSCAN - handles noise
+    (-1 label) separately since it isn't a real cluster."""
+    df = df.copy()
+    df["DBSCAN_Cluster"] = dbscan_labels
+    profile = df.groupby("DBSCAN_Cluster")[features].mean().round(2)
+    profile["count"] = df["DBSCAN_Cluster"].value_counts().sort_index()
+    return profile
