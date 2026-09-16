@@ -228,12 +228,12 @@ Since clustering has no ground-truth labels, evaluation relies on:
 ## Limitations
 
 - Cluster labels (0, 1, 2, 3) are arbitrary and can change between runs — always compare cluster *profiles*, not numeric IDs.
-- The rule-based business recommendations are heuristic starting points, not validated financial conclusions; they should not be used to infer creditworthiness or financial risk.
+- The rule-based business recommendations are heuristic starting points, not validated financial conclusions; they should not be used to infer creditworthiness or financial risk..
 - Results depend on the feature set and scaling choices; alternative feature sets may surface different segment structures.
 
 ---
 
-## Tech Stack
+## Tech Stack 
 
 - **Python 3.9+**
 - **pandas**, **NumPy** — data manipulation
