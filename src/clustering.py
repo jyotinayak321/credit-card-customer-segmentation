@@ -19,24 +19,27 @@ Run as a package module:
 
 import argparse
 import logging
+import time
 
+import numpy as np
 import pandas as pd
 from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.cluster import AgglomerativeClustering, KMeans ,DBSCAN
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import (silhouette_score, davies_bouldin_score,
+                             calinski_harabasz_score, adjusted_rand_score)
 import matplotlib.pyplot as plt
 
 try:
     from .config import DEFAULT_DATA_PATH, OUTPUT_DIR, DEFAULT_FEATURES, DEFAULT_N_CLUSTERS
     from .data_loader import load_data, inspect_data
     from .preprocessing import clean_data, select_features, scale_features, detect_outliers
-    from .visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters
+    from .visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters, plot_algorithm_comparison
     from .business_rules import generate_business_recommendations, evaluate_cluster_health, profile_dbscan_clusters
 except ImportError:
     from config import DEFAULT_DATA_PATH, OUTPUT_DIR, DEFAULT_FEATURES, DEFAULT_N_CLUSTERS
     from data_loader import load_data, inspect_data
     from preprocessing import clean_data, select_features, scale_features, detect_outliers
-    from visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters
+    from visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters, plot_algorithm_comparison
     from business_rules import generate_business_recommendations, evaluate_cluster_health, profile_dbscan_clusters
 
 logging.basicConfig(
@@ -113,6 +116,62 @@ def kmeans_elbow_data(X_scaled, k_range=range(1, 11)):
         if k >= 2:
             silhouettes[k] = silhouette_score(X_scaled, km.labels_)
     return list(k_range), inertias, silhouettes
+
+
+def build_algorithm_comparison(X_scaled, n_clusters=DEFAULT_N_CLUSTERS,
+                               eps=1.5, min_samples=10):
+    """Fit all 3 algorithms on the SAME scaled data and collect one
+    side-by-side metrics table (for the presentation's comparison slide).
+
+    Metrics: Silhouette (higher better), Davies-Bouldin (LOWER better),
+    Calinski-Harabasz (higher better). For DBSCAN, noise points (-1) are
+    excluded before scoring because they belong to no cluster.
+    """
+    models = {
+        "K-Means": ("Yes (k=%d)" % n_clusters,
+                    lambda: KMeans(n_clusters=n_clusters, random_state=42, n_init=10)),
+        "Agglomerative (Ward)": ("Yes (k=%d)" % n_clusters,
+                    lambda: AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")),
+        "DBSCAN": ("No (eps based)",
+                    lambda: DBSCAN(eps=eps, min_samples=min_samples)),
+    }
+
+    labels_dict, rows = {}, {}
+    for name, (needs_k, make) in models.items():
+        t0 = time.perf_counter()
+        labels = make().fit_predict(X_scaled)
+        elapsed = time.perf_counter() - t0
+        labels_dict[name] = labels
+
+        mask = labels != -1
+        n_found = len(set(labels[mask]))
+        noise_pct = 100 * (~mask).sum() / len(labels)
+        if n_found >= 2:
+            sil = round(silhouette_score(X_scaled[mask], labels[mask]), 4)
+            db = round(davies_bouldin_score(X_scaled[mask], labels[mask]), 3)
+            ch = round(calinski_harabasz_score(X_scaled[mask], labels[mask]), 1)
+        else:
+            sil = db = ch = np.nan
+        sizes = pd.Series(labels[mask]).value_counts().sort_index()
+        rows[name] = {
+            "Needs k?": needs_k,
+            "Clusters found": n_found,
+            "Noise %": round(noise_pct, 1),
+            "Silhouette": sil,
+            "Davies-Bouldin": db,
+            "Calinski-Harabasz": ch,
+            "Cluster sizes": " / ".join(str(v) for v in sizes.values),
+            "Fit time (s)": round(elapsed, 3),
+        }
+
+    table = pd.DataFrame(rows).T
+
+    # How much do the methods agree? (Adjusted Rand Index: 1 = identical)
+    agglo = labels_dict["Agglomerative (Ward)"]
+    table["ARI vs Agglo"] = [
+        round(adjusted_rand_score(agglo, labels_dict[n]), 3) for n in table.index
+    ]
+    return table, labels_dict
 
 
 def compare_with_dbscan(X_scaled, eps: float = 1.5, min_samples: int = 10, agglo_labels=None) -> dict:
@@ -255,6 +314,16 @@ def run_pipeline(data_path=None,
         logger.info("DBSCAN cluster profile:")
         print(dbscan_profile)
         
+    if run_kmeans_comparison and run_dbscan_comparison:
+        comp_table, comp_labels = build_algorithm_comparison(
+            X_scaled, n_clusters=n_clusters, eps=dbscan_eps, min_samples=dbscan_min_samples)
+        comp_table.to_csv(output_dir / "algorithm_comparison.csv")
+        plot_algorithm_comparison(X_scaled, comp_labels, comp_table,
+                                  save_path=output_dir / "algorithm_comparison.png")
+        logger.info("Algorithm comparison table:")
+        print(comp_table.to_string())
+        logger.info(f"Comparison figure + CSV saved to {output_dir}")
+
     plot_two_feature_scatter(df_clean, x="PURCHASES", y="CREDIT_LIMIT",
                             save_path=output_dir / "cluster_plot.png")
     plot_pca_clusters(X_scaled, labels, save_path=output_dir / "pca_clusters.png")

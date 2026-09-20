@@ -181,3 +181,54 @@ def plot_kmeans_clusters(X_scaled, labels, centers=None, save_path=None):
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close()
+
+
+def plot_algorithm_comparison(X_scaled, labels_dict, table_df, save_path=None):
+    """ONE figure for the presentation: top row = the 3 algorithms in the
+    SAME 2D PCA space, bottom = metrics table (silhouette, DB, CH, ...)."""
+    try:
+        from .config import OUTPUT_DIR
+    except ImportError:
+        from config import OUTPUT_DIR
+    import numpy as np
+
+    save_path = save_path or (OUTPUT_DIR / "algorithm_comparison.png")
+    X_pca = PCA(n_components=2).fit_transform(X_scaled)
+    names = list(labels_dict.keys())
+    cmap = plt.get_cmap("tab10")
+
+    fig = plt.figure(figsize=(18, 10))
+    gs = fig.add_gridspec(2, len(names), height_ratios=[3, 1.6])
+
+    for i, name in enumerate(names):
+        ax = fig.add_subplot(gs[0, i])
+        labels = np.asarray(labels_dict[name])
+        for j, cl in enumerate(sorted(set(labels))):
+            m = labels == cl
+            if cl == -1:
+                ax.scatter(X_pca[m, 0], X_pca[m, 1], c="gray", marker="x", s=25, label="Noise")
+            else:
+                ax.scatter(X_pca[m, 0], X_pca[m, 1], color=cmap(j % 10), s=12, label=f"Cluster {cl}")
+        sil = table_df.loc[name, "Silhouette"]
+        ax.set_title(f"{name}\nSilhouette = {sil}", fontsize=13)
+        ax.set_xlabel("PC 1")
+        ax.set_ylabel("PC 2")
+        ax.legend(fontsize=8, loc="best")
+
+    ax_t = fig.add_subplot(gs[1, :])
+    ax_t.axis("off")
+    show = table_df.reset_index().rename(columns={"index": "Algorithm"})
+    tbl = ax_t.table(cellText=show.values, colLabels=show.columns, loc="center", cellLoc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 2.0)
+    for (r, _c), cell in tbl.get_celld().items():
+        if r == 0:
+            cell.set_facecolor("#dbe9f6")
+            cell.set_text_props(weight="bold")
+
+    fig.suptitle("Clustering Algorithm Comparison: K-Means vs Agglomerative vs DBSCAN",
+                fontsize=16, fontweight="bold")
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(save_path, dpi=150)
+    plt.close()

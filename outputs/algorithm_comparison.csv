@@ -1,0 +1,4 @@
+,Needs k?,Clusters found,Noise %,Silhouette,Davies-Bouldin,Calinski-Harabasz,Cluster sizes,Fit time (s),ARI vs Agglo
+K-Means,Yes (k=4),4,0.0,0.3538,1.113,1255.9,394 / 579 / 313 / 714,0.014,0.984
+Agglomerative (Ward),Yes (k=4),4,0.0,0.3528,1.116,1254.7,704 / 589 / 313 / 394,0.064,1.0
+DBSCAN,No (eps based),3,1.6,0.459,0.913,1238.1,1293 / 388 / 287,0.069,0.566
