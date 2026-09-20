@@ -113,3 +113,71 @@ def plot_dbscan_pca(X_scaled, dbscan_labels, save_path=None):
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+
+def plot_kmeans_elbow(k_values, inertias, silhouettes=None, chosen_k=None, save_path=None):
+    """Elbow curve (inertia vs k) for K-Means, with an optional silhouette
+    panel. Elbow = the k after which inertia stops dropping sharply."""
+    try:
+        from .config import OUTPUT_DIR
+    except ImportError:
+        from config import OUTPUT_DIR
+
+    save_path = save_path or (OUTPUT_DIR / "kmeans_elbow_curve.png")
+    n_panels = 2 if silhouettes else 1
+    fig, axes = plt.subplots(1, n_panels, figsize=(6.5 * n_panels, 5))
+    if n_panels == 1:
+        axes = [axes]
+
+    axes[0].plot(list(k_values), inertias, marker="o")
+    axes[0].set_xlabel("Number of clusters (k)")
+    axes[0].set_ylabel("Inertia (within-cluster sum of squares)")
+    axes[0].set_title("K-Means Elbow Method")
+    axes[0].grid(True, alpha=0.3)
+    if chosen_k is not None and chosen_k in list(k_values):
+        axes[0].axvline(chosen_k, color="red", linestyle="--", label=f"chosen k={chosen_k}")
+        axes[0].legend()
+
+    if silhouettes:
+        ks = list(silhouettes.keys())
+        axes[1].plot(ks, list(silhouettes.values()), marker="o", color="green")
+        axes[1].set_xlabel("Number of clusters (k)")
+        axes[1].set_ylabel("Silhouette score")
+        axes[1].set_title("K-Means Silhouette Score by k")
+        axes[1].grid(True, alpha=0.3)
+        if chosen_k is not None and chosen_k in ks:
+            axes[1].axvline(chosen_k, color="red", linestyle="--", label=f"chosen k={chosen_k}")
+            axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.close()
+
+
+def plot_kmeans_clusters(X_scaled, labels, centers=None, save_path=None):
+    """K-Means clusters in 2D PCA space. Centroids (scaled space) are
+    projected with the SAME PCA so they land in the right place."""
+    try:
+        from .config import OUTPUT_DIR
+    except ImportError:
+        from config import OUTPUT_DIR
+
+    save_path = save_path or (OUTPUT_DIR / "kmeans_clusters.png")
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+
+    plt.figure(figsize=(8, 6))
+    cmap = plt.get_cmap("tab10")
+    for i, cl in enumerate(sorted(set(labels))):
+        mask = labels == cl
+        plt.scatter(X_pca[mask, 0], X_pca[mask, 1], color=cmap(i), s=20, label=f"Cluster {cl}")
+    if centers is not None:
+        c_pca = pca.transform(centers)
+        plt.scatter(c_pca[:, 0], c_pca[:, 1], c="black", marker="X", s=200,
+                    edgecolors="white", label="Centroids")
+    plt.legend()
+    plt.xlabel("Principal Component 1")
+    plt.ylabel("Principal Component 2")
+    plt.title(f"K-Means Clusters in PCA Space (k={len(set(labels))})")
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.close()

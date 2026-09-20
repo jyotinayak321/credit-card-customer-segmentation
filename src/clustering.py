@@ -30,13 +30,13 @@ try:
     from .config import DEFAULT_DATA_PATH, OUTPUT_DIR, DEFAULT_FEATURES, DEFAULT_N_CLUSTERS
     from .data_loader import load_data, inspect_data
     from .preprocessing import clean_data, select_features, scale_features, detect_outliers
-    from .visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca
+    from .visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters
     from .business_rules import generate_business_recommendations, evaluate_cluster_health, profile_dbscan_clusters
 except ImportError:
     from config import DEFAULT_DATA_PATH, OUTPUT_DIR, DEFAULT_FEATURES, DEFAULT_N_CLUSTERS
     from data_loader import load_data, inspect_data
     from preprocessing import clean_data, select_features, scale_features, detect_outliers
-    from visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca
+    from visualization import plot_correlation_heatmap, plot_two_feature_scatter, plot_pca_clusters, plot_outlier_boxplots, plot_dbscan_pca, plot_kmeans_elbow, plot_kmeans_clusters
     from business_rules import generate_business_recommendations, evaluate_cluster_health, profile_dbscan_clusters
 
 logging.basicConfig(
@@ -90,6 +90,7 @@ def compare_with_kmeans(X_scaled, n_clusters: int = DEFAULT_N_CLUSTERS, agglo_la
     result = {
         "kmeans_labels": kmeans_labels,
         "kmeans_silhouette": kmeans_silhouette,
+        "kmeans_centers": kmeans.cluster_centers_,
     }
 
     if agglo_labels is not None:
@@ -101,6 +102,19 @@ def compare_with_kmeans(X_scaled, n_clusters: int = DEFAULT_N_CLUSTERS, agglo_la
         )
 
     return result
+
+
+def kmeans_elbow_data(X_scaled, k_range=range(1, 11)):
+    """Inertia for every k (elbow method) + silhouette for k >= 2."""
+    inertias, silhouettes = [], {}
+    for k in k_range:
+        km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X_scaled)
+        inertias.append(km.inertia_)
+        if k >= 2:
+            silhouettes[k] = silhouette_score(X_scaled, km.labels_)
+    return list(k_range), inertias, silhouettes
+
+
 def compare_with_dbscan(X_scaled, eps: float = 1.5, min_samples: int = 10, agglo_labels=None) -> dict:
     """Train DBSCAN and compare against Agglomerative Clustering.
 
@@ -212,7 +226,15 @@ def run_pipeline(data_path=None,
     df_clean["Cluster"] = labels
 
     if run_kmeans_comparison:
-        compare_with_kmeans(X_scaled, n_clusters=n_clusters, agglo_labels=labels)
+        kmeans_result = compare_with_kmeans(X_scaled, n_clusters=n_clusters, agglo_labels=labels)
+
+        k_values, inertias, km_sil = kmeans_elbow_data(X_scaled)
+        plot_kmeans_elbow(k_values, inertias, silhouettes=km_sil, chosen_k=n_clusters,
+                          save_path=output_dir / "kmeans_elbow_curve.png")
+        plot_kmeans_clusters(X_scaled, kmeans_result["kmeans_labels"],
+                             centers=kmeans_result["kmeans_centers"],
+                             save_path=output_dir / "kmeans_clusters.png")
+        logger.info(f"K-Means plots saved to {output_dir}")
     
     
     if run_dbscan_comparison:
